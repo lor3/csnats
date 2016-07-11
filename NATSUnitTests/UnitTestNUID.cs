@@ -1,34 +1,27 @@
 ﻿// Copyright 2015 Apcera Inc. All rights reserved.
 
 using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using NATS.Client;
-using System.Threading;
-using System.Text;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Xml.Serialization;
-using System.IO;
 using System.Diagnostics;
 using System.Collections.Generic;
+using Xunit;
 
 namespace NATS.Client
 {
     /// <summary>
     /// Run these tests with the gnatsd auth.conf configuration file.
     /// </summary>
-    [TestClass]
     public class TestNUID
     {
-        [TestMethod]
+        [Fact]
         public void TestGlobalNUID()
         {
             NUID n = NUID.Instance;
-            Assert.IsNotNull(n);
-            Assert.IsNotNull(n.Pre);
-            Assert.AreNotEqual(0, n.Seq);
+            Assert.NotNull(n);
+            Assert.NotNull(n.Pre);
+            Assert.NotEqual(0, n.Seq);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestNUIDRollover()
         {
             NUID gnuid = NUID.Instance;
@@ -46,14 +39,14 @@ namespace NATS.Client
                     areEqual = false;
             }
 
-            Assert.IsFalse(areEqual);
+            Assert.False(areEqual);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestNUIDLen()
         {
             string nuid = new NUID().Next;
-            Assert.IsTrue(nuid.Length == NUID.LENGTH);
+            Assert.True(nuid.Length == NUID.LENGTH);
         }
 
         static void printElapsedTime(long operations, Stopwatch sw)
@@ -80,19 +73,19 @@ namespace NATS.Client
             printElapsedTime(count, sw);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestNUIDSpeed()
         {
             runNUIDSpeedTest(NUID.Instance);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestGlobalNUIDSpeed()
         {
             runNUIDSpeedTest(new NUID());
         }
 
-        [TestMethod]
+        [Fact]
         public void TestNuidBasicUniqueess()
         {
             int count = 1000000;
@@ -103,7 +96,7 @@ namespace NATS.Client
                 String n = NUID.NextGlobal;
                 if (m.ContainsKey(n))
                 {
-                    Assert.Fail("Duplicate NUID found: " + n);
+                    throw new Exception("Duplicate NUID found: " + n);
                 }
                 else
                 {

@@ -72,7 +72,7 @@ namespace NATS.Client
             init(subject, null, null);
         }
 
-        internal Msg(MsgArg arg, Subscription s, byte[] payload, long length)
+        internal Msg(MsgArg arg, Subscription s, byte[] payload, int length)
         {
             this.subject = arg.subject;
             this.reply   = arg.reply;

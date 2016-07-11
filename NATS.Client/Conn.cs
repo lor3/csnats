@@ -320,21 +320,11 @@ namespace NATS.Client
                         sslStream = null;
                     }
 
-                    client = new TcpClient(s.url.Host, s.url.Port);
-#if async_connect
                     client = new TcpClient();
-                    IAsyncResult r = client.BeginConnect(s.url.Host, s.url.Port, null, null);
+	                if(!client.ConnectAsync(s.url.Host, s.url.Port).Wait(timeoutMillis))
+						throw new NATSConnectionException("Timeout");
 
-                    if (r.AsyncWaitHandle.WaitOne(
-                        TimeSpan.FromMilliseconds(timeoutMillis)) == false)
-                    {
-                        client = null;
-                        throw new NATSConnectionException("Timeout");
-                    }
-                    client.EndConnect(r);
-#endif
-
-                    client.NoDelay = false;
+					client.NoDelay = false;
 
                     client.ReceiveBufferSize = Defaults.defaultBufSize*2;
                     client.SendBufferSize    = Defaults.defaultBufSize;
@@ -372,16 +362,21 @@ namespace NATS.Client
                 sslStream = new SslStream(stream, false, cb, null,
                     EncryptionPolicy.RequireEncryption);
 
-                try
-                {
-                    SslProtocols protocol = (SslProtocols)Enum.Parse(typeof(SslProtocols), "Tls12");
-                    sslStream.AuthenticateAsClient(hostName, options.certificates, protocol, true);
-                }
-                catch (AuthenticationException ex)
-                {
-                    client.Close();
-                    throw new NATSConnectionException("TLS Authentication error", ex);
-                }
+	            try
+	            {
+		            SslProtocols protocol = (SslProtocols) Enum.Parse(typeof(SslProtocols), "Tls12");
+		            sslStream.AuthenticateAsClientAsync(hostName, options.certificates, protocol, true).Wait();
+	            }
+	            catch (AggregateException ex)
+	            {
+					client.Dispose();
+					throw new NATSConnectionException("TLS Authentication error", ex.Flatten().InnerException);
+				}
+	            catch (AuthenticationException ex)
+	            {
+					client.Dispose();
+					throw new NATSConnectionException("TLS Authentication error", ex);
+	            }
             }
 
             internal int ConnectTimeout
@@ -427,7 +422,7 @@ namespace NATS.Client
                         s.Dispose();
 
                     if (c != null)
-                        c.Close();
+                        c.Dispose();
                 }
                 catch (Exception) { }
             }
@@ -1181,8 +1176,12 @@ namespace NATS.Client
 
             if (pending.Length > 0)
             {
-                bw.Write(pending.GetBuffer(), 0, (int)pending.Length);
-                bw.Flush();
+	            ArraySegment<byte> buffer;
+	            if (pending.TryGetBuffer(out buffer))
+	            {
+		            bw.Write(buffer.Array, buffer.Offset, (int) pending.Length);
+		            bw.Flush();
+	            }
             }
 
             pending = null;
@@ -1523,7 +1522,7 @@ namespace NATS.Client
         // appropriate channel for processing. All subscribers have their
         // their own channel. If the channel is full, the connection is
         // considered a slow subscriber.
-        internal void processMsg(byte[] msg, long length)
+        internal void processMsg(byte[] msg, int length)
         {
             bool maxReached = false;
             Subscription s;

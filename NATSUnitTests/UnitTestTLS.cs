@@ -3,39 +3,19 @@
 using System;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NATS.Client;
 using System.Reflection;
-using System.IO;
 using System.Linq;
 using System.Threading;
+using Xunit;
 
 namespace NATSUnitTests
 {
     /// <summary>
     /// Run these tests with the gnatsd auth.conf configuration file.
     /// </summary>
-    [TestClass]
     public class TestTLS
     {
-
-        private TestContext testContextInstance;
-        /// <summary>
-        ///Gets or sets the test context which provides
-        ///information about and functionality for the current test run.
-        ///</summary>
-        public TestContext TestContext
-        {
-            get
-            {
-                return testContextInstance;
-            }
-            set
-            {
-                testContextInstance = value;
-            }
-        }
-
         int hitDisconnect;
 
         UnitTestUtilities util = new UnitTestUtilities();
@@ -52,7 +32,7 @@ namespace NATSUnitTests
                 opts.DisconnectedEventHandler += handleDisconnect;
                 IConnection c = new ConnectionFactory().CreateConnection(url);
 
-                Assert.Fail("Expected a failure; did not receive one");
+                throw new Exception("Expected a failure; did not receive one");
                 
                 c.Close();
             }
@@ -64,13 +44,13 @@ namespace NATSUnitTests
                 }
                 else
                 {
-                    Assert.Fail("Unexpected exception thrown: " + e);
+                    throw new Exception("Unexpected exception thrown: " + e);
                 }
             }
             finally
             {
                 if (hitDisconnect > 0)
-                    Assert.Fail("The disconnect event handler was incorrectly invoked.");
+                    throw new Exception("The disconnect event handler was incorrectly invoked.");
             }
         }
 
@@ -97,19 +77,19 @@ namespace NATSUnitTests
 
             X509Certificate serverCert = new X509Certificate(
                     UnitTestUtilities.GetFullCertificatePath(
-                    TestContext, "server-cert.pem"));
+                    "server-cert.pem"));
 
             // UNSAFE hack for testing purposes.
-            if (serverCert.GetRawCertDataString().Equals(certificate.GetRawCertDataString()))
+            if (serverCert.GetPublicKey().SequenceEqual(certificate.GetPublicKey()))
                 return true;
 
             return false;
         }
 
-        [TestMethod]
+        [Fact]
         public void TestTlsSuccessWithCert()
         {
-            using (NATSServer srv = util.CreateServerWithConfig(TestContext, "tls_1222_verify.conf"))
+            using (NATSServer srv = util.CreateServerWithConfig("tls_1222_verify.conf"))
             {
                 Options opts = ConnectionFactory.GetDefaultOptions();
                 opts.Secure = true;
@@ -123,7 +103,7 @@ namespace NATSUnitTests
                 //    -inkey client-key.pem -in client-cert.pem
                 X509Certificate2 cert = new X509Certificate2(
                     UnitTestUtilities.GetFullCertificatePath(
-                        TestContext, "client.pfx"), "password");
+                        "client.pfx"), "password");
 
                 opts.AddCertificate(cert);
 
@@ -140,10 +120,10 @@ namespace NATSUnitTests
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void TestTlsFailWithCert()
         {
-            using (NATSServer srv = util.CreateServerWithConfig(TestContext, "tls_1222_verify.conf"))
+            using (NATSServer srv = util.CreateServerWithConfig("tls_1222_verify.conf"))
             {
                 Options opts = ConnectionFactory.GetDefaultOptions();
                 opts.Secure = true;
@@ -153,7 +133,7 @@ namespace NATSUnitTests
                 // this will fail, because it's not complete - missing the private
                 // key.
                 opts.AddCertificate(UnitTestUtilities.GetFullCertificatePath(
-                        TestContext, "client-cert.pem"));
+                        "client-cert.pem"));
 
                 try
                 {
@@ -165,14 +145,14 @@ namespace NATSUnitTests
                     return;
                 }
 
-                Assert.Fail("Did not receive exception.");
+                throw new Exception("Did not receive exception.");
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void TestTlsFailWithBadAuth()
         {
-            using (NATSServer srv = util.CreateServerWithConfig(TestContext, "tls_1222_user.conf"))
+            using (NATSServer srv = util.CreateServerWithConfig("tls_1222_user.conf"))
             {
                 Options opts = ConnectionFactory.GetDefaultOptions();
                 opts.Secure = true;
@@ -182,7 +162,7 @@ namespace NATSUnitTests
                 // this will fail, because it's not complete - missing the private
                 // key.
                 opts.AddCertificate(UnitTestUtilities.GetFullCertificatePath(
-                        TestContext, "client-cert.pem"));
+                        "client-cert.pem"));
 
                 try
                 {
@@ -195,14 +175,14 @@ namespace NATSUnitTests
                     return;
                 }
 
-                Assert.Fail("Did not receive exception.");
+                throw new Exception("Did not receive exception.");
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void TestTlsSuccessSecureConnect()
         {
-            using (NATSServer srv = util.CreateServerWithConfig(TestContext, "tls_1222.conf"))
+            using (NATSServer srv = util.CreateServerWithConfig("tls_1222.conf"))
             {
                 // we can't call create secure connection w/ the certs setup as they are
                 // so we'll override the 
@@ -224,13 +204,13 @@ namespace NATSUnitTests
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void TestTlsReconnect()
         {
             ConditionalObj reconnectedObj = new ConditionalObj();
 
-            using (NATSServer srv = util.CreateServerWithConfig(TestContext, "tls_1222.conf"),
-                   srv2 = util.CreateServerWithConfig(TestContext, "tls_1224.conf"))
+            using (NATSServer srv = util.CreateServerWithConfig("tls_1222.conf"),
+                   srv2 = util.CreateServerWithConfig("tls_1224.conf"))
             {
                 System.Threading.Thread.Sleep(1000);
 
@@ -272,14 +252,14 @@ namespace NATSUnitTests
 
         // Tests if reconnection can still occur after a user authorization failure
         // under TLS.
-        [TestMethod]
+        [Fact]
         public void TestTlsReconnectAuthTimeout()
         {
             ConditionalObj obj = new ConditionalObj();
 
-            using (NATSServer s1 = util.CreateServerWithConfig(TestContext, "auth_tls_1222.conf"),
-                              s2 = util.CreateServerWithConfig(TestContext, "auth_tls_1223_timeout.conf"),
-                              s3 = util.CreateServerWithConfig(TestContext, "auth_tls_1224.conf"))
+            using (NATSServer s1 = util.CreateServerWithConfig("auth_tls_1222.conf"),
+                              s2 = util.CreateServerWithConfig("auth_tls_1223_timeout.conf"),
+                              s3 = util.CreateServerWithConfig("auth_tls_1224.conf"))
             {
 
                 Options opts = ConnectionFactory.GetDefaultOptions();
@@ -308,13 +288,13 @@ namespace NATSUnitTests
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void TestTlsReconnectAuthTimeoutLateClose()
         {
             ConditionalObj obj = new ConditionalObj();
 
-            using (NATSServer s1 = util.CreateServerWithConfig(TestContext, "auth_tls_1222.conf"),
-                              s2 = util.CreateServerWithConfig(TestContext, "auth_tls_1224.conf"))
+            using (NATSServer s1 = util.CreateServerWithConfig("auth_tls_1222.conf"),
+                              s2 = util.CreateServerWithConfig("auth_tls_1224.conf"))
             {
 
                 Options opts = ConnectionFactory.GetDefaultOptions();
@@ -336,13 +316,13 @@ namespace NATSUnitTests
                 // inject an authorization timeout, as if it were processed by an incoming server message.
                 // this is done at the parser level so that parsing is also tested,
                 // therefore it needs reflection since Parser is an internal type.
-                Type parserType = typeof(Connection).Assembly.GetType("NATS.Client.Parser");
-                Assert.IsNotNull(parserType, "Failed to find NATS.Client.Parser");
+                Type parserType = typeof(Connection).GetTypeInfo().Assembly.GetType("NATS.Client.Parser");
+                Assert.True(parserType != null, "Failed to find NATS.Client.Parser");
                 BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
-                object parser = Activator.CreateInstance(parserType, flags, null, new object[] { c }, null);
-                Assert.IsNotNull(parser, "Failed to instanciate a NATS.Client.Parser");
+                object parser = Activator.CreateInstance(parserType, c);
+                Assert.True(parser != null, "Failed to instanciate a NATS.Client.Parser");
                 MethodInfo parseMethod = parserType.GetMethod("parse", flags);
-                Assert.IsNotNull(parseMethod, "Failed to find method parse in NATS.Client.Parser");
+                Assert.True(parseMethod != null, "Failed to find method parse in NATS.Client.Parser");
 
                 byte[] bytes = "-ERR 'Authorization Timeout'\r\n".ToCharArray().Select(ch => (byte)ch).ToArray();
                 parseMethod.Invoke(parser, new object[] { bytes, bytes.Length });

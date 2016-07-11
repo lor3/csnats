@@ -29,7 +29,7 @@ namespace NATS.Client
         byte[] msgBufBase = new byte[Defaults.defaultBufSize];
         MemoryStream msgBufStream = null;
 
-        internal Parser(Connection conn)
+        public Parser(Connection conn)
         {
             argBufStream = new MemoryStream(argBufBase);
             msgBufStream = new MemoryStream(msgBufBase);

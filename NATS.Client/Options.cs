@@ -4,6 +4,7 @@ using System;
 using System.Text;
 using System.Security.Cryptography.X509Certificates;
 using System.Net.Security;
+using System.Reflection;
 
 namespace NATS.Client
 {
@@ -295,7 +296,7 @@ namespace NATS.Client
         private void appendEventHandler(StringBuilder sb, String name, Delegate eh)
         {
             if (eh != null)
-                sb.AppendFormat("{0}={1};", name, eh.Method.Name);
+                sb.AppendFormat("{0}={1};", name, eh.GetMethodInfo().Name);
             else
                 sb.AppendFormat("{0}=null;", name);
         }
